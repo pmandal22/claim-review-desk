@@ -19,7 +19,7 @@ Review a treatment request against the patient's active coverage and supporting 
 
 Send the three fields below in one message. You can also select a sample claim to begin.
 
-```text
+```Claim
 Patient ID: 137588944
 Treatment Code: Z12.31
 Claim Details: Screening mammogram requested as part of routine preventive care.
