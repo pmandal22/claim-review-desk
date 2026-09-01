@@ -73,6 +73,8 @@ async def handle_message(message):
         tasks = graph.get_state(config=thread).tasks
 
         if tasks:
+            await show_evidence(state)
+
             feedback = tasks[0].interrupts[0].value.get("feedback")
 
             await cl.Message(f"## Manual Review Required\n\n{feedback}").send()
@@ -109,7 +111,7 @@ async def handle_message(message):
 async def complete_human_review(decision):
     global conversation_stage
     state = graph.invoke(Command(resume=decision), config=thread)
-    await show_results(state)
+    await show_decision(state)
     await cl.Message("The claim decision has been recorded.").send()
     conversation_stage = "restart"
 
@@ -247,22 +249,26 @@ def format_insurance_summary(insurance_data):
     )
 
 
-async def show_results(state):
+async def show_evidence(state):
     policy_evidence = format_policy_evidence(state.get("policy_docs", []))
 
     async with cl.Step(name="Policy Evidence", type="tool") as policy_step:
         policy_step.output = policy_evidence
 
     await cl.Message(
-        f"""## Claim Summary
+        f"""## Claim Evidence
 
 ### Patient
 {format_patient_summary(state["patient_data"])}
 
 ### Insurance
-{format_insurance_summary(state["insurance_data"])}
+{format_insurance_summary(state["insurance_data"])}"""
+    ).send()
 
-### Assessment
+
+async def show_decision(state):
+    await cl.Message(
+        f"""### Assessment
 {state['ai_validation_feedback']}
 
 ### Decision
@@ -271,3 +277,8 @@ async def show_results(state):
 Start a new review when you are ready.""",
         actions=[cl.Action(name="new_claim", payload={}, label="New claim", icon="plus")],
     ).send()
+
+
+async def show_results(state):
+    await show_evidence(state)
+    await show_decision(state)

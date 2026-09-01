@@ -88,7 +88,7 @@ Claim Details: Routine screening colonoscopy performed on patient aged 50, as pa
 
 The parser accepts `Patient ID`, `Treatment Code`, and `Claim Details` (or `Claim Reason`) labels case-insensitively, and folds unlabeled continuation lines into the claim details. Missing fields are re-prompted before the graph runs.
 
-If the LLM returns `More Info`, the run halts and the UI shows the model's rationale alongside Approve / Reject buttons. Your choice becomes the recorded `final_decision`. Otherwise the decision is stored immediately and the summary — patient, coverage, assessment, decision, and the retrieved policy evidence in a collapsible step — is rendered directly.
+If the LLM returns `More Info`, the run halts and the UI first renders the patient, coverage, and retrieved policy evidence (in a collapsible step), then shows the model's rationale alongside Approve / Reject buttons so the reviewer can weigh the evidence before deciding. Your choice becomes the recorded `final_decision`. Otherwise the decision is stored immediately and the same evidence, assessment, and decision are rendered directly.
 
 Try all three claims in [test data.txt](test%20data.txt) to exercise each branch.
 
