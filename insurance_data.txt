@@ -1,0 +1,55 @@
+[
+  {
+    "policy_name": "Gold Plus Health Plan",
+    "procedure_code": "Z12.31",
+    "procedure_name": "Routine Screening Colonoscopy",
+    "coverage": [
+      "Fully approved and covered as preventive care for patients aged 45 years and older, without exceptions.",
+      "No copayment, deductible, or pre-authorization is required for eligible preventive colonoscopies.",
+      "Coverage explicitly includes routine colonoscopy once every 12 months for all eligible patients aged 45 and above."
+    ],
+    "policy_restrictions": [
+      "Only preventive screenings performed more frequently than once per 12-month period require explicit physician justification."
+    ],
+    "patient_exceptions": [
+      "Patients with documented medical necessity (e.g., family history of colorectal cancer) can have screenings more frequently upon documentation."
+    ]
+  },
+  {
+    "icd_10_code": "M54.5",
+    "definition": "Chronic lower back pain.",
+    "coverage": [
+      "Treatment, including surgery, requires explicit pre-authorization.",
+      "Elective spinal surgery is generally not covered unless medically necessary and pre-authorized."
+    ],
+    "policy_restrictions": [
+      "Procedures performed at facilities previously flagged for fraudulent claims are not eligible for coverage under any circumstance."
+    ],
+    "patient_exceptions": []
+  },
+  {
+    "cpt_code": "83036",
+    "procedure": "Hemoglobin A1c Test",
+    "insurance_coverage": [
+      "Fully covered twice annually for diabetic patients or those in chronic disease management programs.",
+      "Additional tests beyond twice annually require explicit physician justification and documentation for coverage approval."
+    ],
+    "pre_authorization_required": "No",
+    "exclusions": "Additional A1c tests beyond two per year without physician documentation of medical necessity are not covered.",
+    "patient_exceptions": [
+      "Documented cases of uncontrolled diabetes or significant changes in diabetic management may allow coverage for additional tests upon review."
+    ]
+  },
+  {
+    "policy_name": "Silver Standard Plan",
+    "coverage": "Inpatient treatments are covered; outpatient procedures require an additional rider.",
+    "copayment": "$30 per inpatient visit.",
+    "pre_authorization": "Mandatory for all inpatient admissions and elective procedures.",
+    "exclusions": "Alternative therapies, elective surgeries without medical necessity, and procedures at flagged facilities are not covered.",
+    "annual_deductible": "$1,000 per individual, $2,500 per family.",
+    "patient_exceptions": [
+      "Emergency outpatient procedures are covered fully without an additional rider."
+    ]
+  }
+]
+

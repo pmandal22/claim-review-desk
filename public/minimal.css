@@ -1,0 +1,122 @@
+:root {
+  --minimal-ink: #172033;
+  --minimal-muted: #5d697c;
+  --minimal-line: #d9e1ea;
+  --minimal-surface: #ffffff;
+  --minimal-page: #f3f6fa;
+  --minimal-accent: #e11d6b;
+  --minimal-accent-dark: #bd1458;
+  --minimal-accent-soft: #fff0f6;
+}
+
+body {
+  background: var(--minimal-page);
+  color: var(--minimal-ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.MuiPaper-root,
+.MuiDrawer-paper {
+  background: var(--minimal-surface) !important;
+  box-shadow: none !important;
+}
+
+.MuiDrawer-paper {
+  border-right: 1px solid var(--minimal-line) !important;
+}
+
+.MuiTypography-root,
+.markdown-body {
+  font-family: Georgia, "Times New Roman", serif !important;
+}
+
+.MuiTypography-body1,
+.MuiInputBase-input,
+button,
+code,
+pre {
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace !important;
+}
+
+.MuiInputBase-root {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.MuiInputBase-root.Mui-focused {
+  border-color: var(--minimal-accent) !important;
+  box-shadow: 0 0 0 3px rgba(225, 29, 107, 0.14) !important;
+}
+
+.MuiButton-root {
+  border-radius: 5px !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
+
+.MuiButton-containedPrimary {
+  background: var(--minimal-accent) !important;
+}
+
+.MuiButton-containedPrimary:hover {
+  background: var(--minimal-accent-dark) !important;
+}
+
+.MuiDivider-root {
+  border-color: var(--minimal-line) !important;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--minimal-ink);
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 2.15rem !important;
+  font-weight: 700 !important;
+}
+
+h2 {
+  margin-top: 1.75rem !important;
+  font-size: 1.25rem !important;
+}
+
+p,
+li {
+  color: var(--minimal-ink);
+  line-height: 1.65;
+}
+
+code {
+  background: #edf1f6;
+  border-radius: 3px;
+  color: #334155;
+}
+
+pre {
+  background: #172033 !important;
+  border: 1px solid #27354e;
+  border-radius: 8px !important;
+  color: #f8fafc !important;
+  padding: 1rem !important;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+}
+
+.markdown-body blockquote {
+  border-left-color: var(--minimal-accent) !important;
+  color: var(--minimal-muted);
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.8rem !important;
+  }
+}

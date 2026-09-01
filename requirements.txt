@@ -1,0 +1,12 @@
+langchain
+langgraph
+langchain-openai
+langchain-chroma
+ipython
+psycopg[binary]
+langgraph-checkpoint-postgres
+chainlit
+fastapi
+uvicorn
+beautifulsoup4
+langchain_unstructured
