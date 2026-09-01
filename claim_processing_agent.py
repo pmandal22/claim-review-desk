@@ -9,7 +9,7 @@ from langchain_chroma import Chroma
 import psycopg
 import requests
 from langgraph.types import interrupt
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
 
@@ -33,40 +33,59 @@ class ClaimState(TypedDict):
 # ---------------------- Constants ----------------------
 FHIR_BASE_URL = "https://hapi.fhir.org/baseR4"
 
-llm = ChatOpenAI(model="gpt-5", temperature=0.0)
+llm = ChatOpenAI(model="gpt-5", temperature=0.0, reasoning_effort="low")
+
+# Reused across the two FHIR calls so they share one connection instead of
+# each paying a fresh TCP/TLS handshake to the sandbox.
+http_session = requests.Session()
 
 # Load policy documents for RAG
-loader = TextLoader("insurance_data.txt")
+SOURCE_FILE = "insurance_data.txt"
+PERSIST_DIRECTORY = ".chroma_policy_store"
+
+loader = TextLoader(SOURCE_FILE)
 documents = loader.load()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 chunks = text_splitter.split_documents(documents)
 
 embeddings = OpenAIEmbeddings()
-vector_store = Chroma.from_documents(chunks, embeddings)
+
+# Re-embedding the whole corpus on every import is expensive; only do it
+# when insurance_data.txt has actually changed since the last run.
+_source_mtime = str(os.path.getmtime(SOURCE_FILE))
+_mtime_stamp_path = os.path.join(PERSIST_DIRECTORY, ".source_mtime")
+
+if os.path.exists(_mtime_stamp_path) and open(_mtime_stamp_path).read() == _source_mtime:
+    vector_store = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
+else:
+    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=PERSIST_DIRECTORY)
+    os.makedirs(PERSIST_DIRECTORY, exist_ok=True)
+    with open(_mtime_stamp_path, "w") as f:
+        f.write(_source_mtime)
+
+# Precompute the keyword index once instead of pulling every document back
+# out of Chroma and re-tokenizing it on every hybrid_search call.
+_KEYWORD_INDEX = [
+    (chunk.page_content, set(re.findall(r"\w+", chunk.page_content.lower())))
+    for chunk in chunks
+]
 
 
 def hybrid_search(query: str, k: int = 4) -> List[Document]:
     query_terms = set(re.findall(r"\w+", query.lower()))
     semantic_results = vector_store.similarity_search_with_relevance_scores(query, k=k * 3)
-    stored_documents = vector_store.get(include=["documents"]).get("documents", [])
 
     keyword_results = sorted(
-        [
-            (
-                Document(page_content=document),
-                len(query_terms & set(re.findall(r"\w+", document.lower())))
-            )
-            for document in stored_documents
-        ],
-        key=lambda item: item[1],
+        _KEYWORD_INDEX,
+        key=lambda item: len(query_terms & item[1]),
         reverse=True,
     )
 
     fused_scores = {}
     for rank, (document, _) in enumerate(semantic_results, start=1):
         fused_scores[document.page_content] = 1 / (60 + rank)
-    for rank, (document, _) in enumerate(keyword_results, start=1):
-        fused_scores[document.page_content] = fused_scores.get(document.page_content, 0) + 1 / (60 + rank)
+    for rank, (content, _) in enumerate(keyword_results, start=1):
+        fused_scores[content] = fused_scores.get(content, 0) + 1 / (60 + rank)
 
     return [
         Document(page_content=content)
@@ -77,38 +96,66 @@ def hybrid_search(query: str, k: int = 4) -> List[Document]:
 # ---------------------- Step 1: Fetch Patient Data ----------------------
 def fetch_patient_data(state: ClaimState):
     patient_id = state["patient_id"]
-    response = requests.get(f"{FHIR_BASE_URL}/Patient/{patient_id}")
+    response = http_session.get(f"{FHIR_BASE_URL}/Patient/{patient_id}")
     if response.status_code == 200:
-        state["patient_data"] = response.json()
+        patient_data = response.json()
     else:
-        state["patient_data"] = {"error": f"Failed to fetch patient data for ID {patient_id}"}
-    return state
+        patient_data = {"error": f"Failed to fetch patient data for ID {patient_id}"}
+    # Return only the key this node owns: it runs in parallel with the other
+    # fetch nodes, and LangGraph rejects multiple writes to the same key
+    # (even unchanged ones) within a single step.
+    return {"patient_data": patient_data}
 
 
 # ---------------------- Step 2: Fetch Insurance Data ----------------------
 def fetch_patient_insurance(state: ClaimState):
     patient_id = state["patient_id"]
-    response = requests.get(f"{FHIR_BASE_URL}/Coverage?patient={patient_id}")
+    response = http_session.get(f"{FHIR_BASE_URL}/Coverage?patient={patient_id}")
     if response.status_code == 200:
-        state["insurance_data"] = response.json()
+        insurance_data = response.json()
     else:
-        state["insurance_data"] = {"error": f"Failed to fetch insurance data for patient ID {patient_id}"}
-    return state
+        insurance_data = {"error": f"Failed to fetch insurance data for patient ID {patient_id}"}
+    return {"insurance_data": insurance_data}
 
 # ---------------------- Step 3: Retrieve Policy Documents ----------------------
 def retrieve_policy_docs(state: ClaimState):
     treatment_code = state["treatment_code"]
     query = f"Retrieve policy details for treatment code {treatment_code}"
     docs = hybrid_search(query, k=4)
-    state["policy_docs"] = [doc.page_content for doc in docs]
-    return state
+    return {"policy_docs": [doc.page_content for doc in docs]}
+
+
+def _summarize_patient(patient_data: dict) -> str:
+    if patient_data.get("error"):
+        return patient_data["error"]
+    name = patient_data.get("name", [{}])[0]
+    full_name = " ".join(name.get("given", []) + [name.get("family", "")]).strip()
+    return (
+        f"Name: {full_name or 'Not available'}; "
+        f"Patient ID: {patient_data.get('id', 'Not available')}; "
+        f"Date of birth: {patient_data.get('birthDate', 'Not available')}; "
+        f"Gender: {patient_data.get('gender', 'Not available')}"
+    )
+
+
+def _summarize_insurance(insurance_data: dict) -> str:
+    if insurance_data.get("error"):
+        return insurance_data["error"]
+    entries = insurance_data.get("entry", [])
+    coverage = entries[0].get("resource", {}) if entries else {}
+    return (
+        f"Plan: {coverage.get('payor', [{}])[0].get('display', 'Not available')}; "
+        f"Status: {coverage.get('status', 'Not available')}; "
+        f"Coverage ID: {coverage.get('id', 'Not available')}"
+    )
+
 
 # ---------------------- Step 4: AI-Based Claim Validation ----------------------
 def validate_claim(state: ClaimState):
     claim_text = f"""
     Claim Details: {state["claim_details"]}
-    Patient Data: {state["patient_data"]}
-    Insurance Data: {state["insurance_data"]}
+    Patient: {_summarize_patient(state["patient_data"])}
+    Insurance: {_summarize_insurance(state["insurance_data"])}
     Policy Documents: {state["policy_docs"]}
     """
 
@@ -180,9 +227,15 @@ def create_workflow():
     graph.add_node("human_review", human_review)
 
     # ✅ Define workflow transitions
-    graph.set_entry_point("fetch_patient_data")
-    graph.add_edge("fetch_patient_data", "fetch_patient_insurance")
-    graph.add_edge("fetch_patient_insurance", "retrieve_policy_docs")
+    # fetch_patient_data, fetch_patient_insurance, and retrieve_policy_docs are
+    # mutually independent (they only need patient_id / treatment_code from the
+    # initial input), so they fan out from START and run in parallel instead of
+    # being chained one after another. validate_claim joins once all three land.
+    graph.add_edge(START, "fetch_patient_data")
+    graph.add_edge(START, "fetch_patient_insurance")
+    graph.add_edge(START, "retrieve_policy_docs")
+    graph.add_edge("fetch_patient_data", "validate_claim")
+    graph.add_edge("fetch_patient_insurance", "validate_claim")
     graph.add_edge("retrieve_policy_docs", "validate_claim")
     graph.add_edge("validate_claim", "claim_decision")
     graph.add_edge("human_review", "store_claim")

@@ -4,3 +4,4 @@ __pycache__/
 *.py[cod]
 .chainlit/auth_secret
 .files/
+.chroma_policy_store/

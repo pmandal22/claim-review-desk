@@ -66,9 +66,8 @@ async def handle_message(message):
             await cl.Message(f"Please provide the following required fields: **{missing}**.\n\n{CLAIM_ENTRY_PROMPT}").send()
             return
 
-        await cl.Message("Your claim is being reviewed. Please wait.").send()
-
-        state = graph.invoke(claim_info, config=thread)
+        async with cl.Step(name="Reviewing claim", type="run"):
+            state = await cl.make_async(graph.invoke)(claim_info, config=thread)
         # Human In The Loop
         tasks = graph.get_state(config=thread).tasks
 
@@ -110,7 +109,8 @@ async def handle_message(message):
 
 async def complete_human_review(decision):
     global conversation_stage
-    state = graph.invoke(Command(resume=decision), config=thread)
+    async with cl.Step(name="Recording decision", type="run"):
+        state = await cl.make_async(graph.invoke)(Command(resume=decision), config=thread)
     await show_decision(state)
     await cl.Message("The claim decision has been recorded.").send()
     conversation_stage = "restart"
