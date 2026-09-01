@@ -19,5 +19,16 @@ class ClaimResponse(BaseModel):
 
 @app.post("/process-claim", response_model=ClaimResponse)
 async def process_claim(request: ClaimRequest):
-    pass
+    input_state = {
+        "patient_id": request.patient_id,
+        "treatment_code": request.treatment_code,
+        "claim_details": request.claim_details,
+    }
 
+    result = graph.invoke(
+        input_state, config={"configurable": {"thread_id": "api-thread"}}
+    )
+    return {
+        "final_decision": result.get("final_decision"),
+        "ai_feedback": result.get("ai_validation_feedback"),
+    }

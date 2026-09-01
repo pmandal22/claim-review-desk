@@ -34,7 +34,7 @@ Graph state is checkpointed with an in-memory `MemorySaver`, which is what makes
 - [claims.sql](claims.sql) — schema for the `claims` table
 - [test data.txt](test%20data.txt) — three sample claims, one per policy path (clean approval, flagged facility, needs justification)
 - [.chainlit/config.toml](.chainlit/config.toml), [public/minimal.css](public/minimal.css) — UI configuration and styling
-- [claim_processing_api.py](claim_processing_api.py) — a FastAPI wrapper sketch; the `/process-claim` handler is still a stub
+- [claim_processing_api.py](claim_processing_api.py) — FastAPI wrapper exposing the `/process-claim` endpoint
 - [main.py](main.py) — leftover IDE scaffolding, not part of the app
 
 ## Setup
@@ -62,6 +62,8 @@ DB_CONNECTION_STRING=postgresql://user:password@localhost:5432/claims
 
 ## Running
 
+### Chainlit UI
+
 ```bash
 chainlit run app.py -w
 ```
@@ -79,6 +81,37 @@ The parser accepts `Patient ID`, `Treatment Code`, and `Claim Details` (or `Clai
 If the LLM returns `More Info`, the run halts and the UI shows the model's rationale alongside Approve / Reject buttons. Your choice becomes the recorded `final_decision`. Otherwise the decision is stored immediately and the summary — patient, coverage, assessment, decision, and the retrieved policy evidence in a collapsible step — is rendered directly.
 
 Try all three claims in [test data.txt](test%20data.txt) to exercise each branch.
+
+### FastAPI endpoint
+
+Start the API server with:
+
+```bash
+uvicorn claim_processing_api:app --reload
+```
+
+Submit a claim with `POST /process-claim`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/process-claim \
+     -H "Content-Type: application/json" \
+     -d '{
+          "patient_id": "137588944",
+          "treatment_code": "Z12.31",
+          "claim_details": "Screening mammogram requested as part of routine preventive care."
+     }'
+```
+
+Successful responses contain the final decision and the model's assessment:
+
+```json
+{
+     "final_decision": "Approved",
+     "ai_feedback": "Decision: Approved ..."
+}
+```
+
+When the model requests more information, `final_decision` is `"Request for more info"`. The API currently does not expose an endpoint to resume that interrupted human-review workflow; use the Chainlit UI to approve or reject those claims.
 
 ## Known limitations
 
