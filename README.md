@@ -39,10 +39,18 @@ Graph state is checkpointed with an in-memory `MemorySaver`, which is what makes
 
 ## Setup
 
-Requires Python 3.12+ and a reachable Postgres instance.
+Requires Python 3.12+, a reachable PostgreSQL instance, and an OpenAI API key. Run all commands from the repository root: the agent loads `insurance_data.txt` through a relative path when it starts.
 
 ```bash
-uv sync            # or: pip install -r requirements.txt
+uv sync
+# Or: pip install -r requirements.txt
+```
+
+The current dependency manifests omit three direct runtime imports. Install them after the command above:
+
+```bash
+uv pip install python-dotenv requests langchain-text-splitters
+# Or: pip install python-dotenv requests langchain-text-splitters
 ```
 
 Create the claims table:
@@ -51,7 +59,7 @@ Create the claims table:
 psql "$DB_CONNECTION_STRING" -f claims.sql
 ```
 
-Create a `.env` in the project root:
+Create a `.env` file in the project root:
 
 ```
 OPENAI_API_KEY=sk-...
@@ -59,6 +67,8 @@ DB_CONNECTION_STRING=postgresql://user:password@localhost:5432/claims
 ```
 
 `OPENAI_API_KEY` powers both the `gpt-5` adjudication call and the OpenAI embeddings used for retrieval.
+
+> The FHIR endpoint is a public sandbox. Use only its sample identifiers; do not submit real patient data or other protected health information.
 
 ## Running
 
@@ -90,6 +100,8 @@ Start the API server with:
 uvicorn claim_processing_api:app --reload
 ```
 
+Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
+
 Submit a claim with `POST /process-claim`:
 
 ```bash
@@ -111,7 +123,7 @@ Successful responses contain the final decision and the model's assessment:
 }
 ```
 
-When the model requests more information, `final_decision` is `"Request for more info"`. The API currently does not expose an endpoint to resume that interrupted human-review workflow; use the Chainlit UI to approve or reject those claims.
+When the model requests more information, `final_decision` is `"Request for more info"`. The API currently does not expose an endpoint to resume that interrupted human-review workflow; use the Chainlit UI to approve or reject those claims. The API also uses one fixed checkpoint thread (`"api-thread"`), so it is a demonstration endpoint rather than a concurrent multi-user service.
 
 ## Known limitations
 
@@ -119,4 +131,5 @@ When the model requests more information, `final_decision` is `"Request for more
 - **Ephemeral checkpoints.** `MemorySaver` keeps graph state in process memory; `langgraph-checkpoint-postgres` is already a dependency if you want to swap it in.
 - **Startup cost.** The policy corpus is re-embedded into a fresh in-memory Chroma collection on every import of `claim_processing_agent`.
 - **No test suite.**
-- **Public FHIR server.** Patient lookups hit `hapi.fhir.org`, a shared sandbox — do not submit real patient identifiers.
+- **Public FHIR server.** Patient lookups hit `hapi.fhir.org`, a shared sandbox; do not submit real patient identifiers or protected health information.
+- **API checkpoint reuse.** Every API request uses the same LangGraph thread id (`"api-thread"`), which can mix checkpoint state between requests.
