@@ -4,15 +4,7 @@ An AI-assisted health insurance claim review workflow. A [LangGraph](https://lan
 
 ## How it works
 
-```
-fetch_patient_data → fetch_patient_insurance → retrieve_policy_docs → validate_claim → claim_decision
-                                                                                            │
-                                                              Approved / Rejected ──────────┤
-                                                                                            │
-                                                                    More Info → human_review (interrupt)
-                                                                                            │
-                                                                                       store_claim
-```
+![Claim Review Desk architecture](claim-review-desk-architecture.png)
 
 | Node | What it does |
 | --- | --- |
